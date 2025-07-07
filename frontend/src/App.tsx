@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, } from "react";
+import { useState, type ChangeEvent, useEffect } from "react";
 import axios from "axios";
 import { supabase } from "./supabaseClient";
 import "./App.css";
@@ -11,6 +11,7 @@ interface QuickHitAnswer { text: string; is_correct: boolean; }
 interface QuickHit { question_text: string; rationale: string; answers: QuickHitAnswer[]; }
 interface Question {
   id: string;
+  question_bank: string; // Added question_bank field
   blueprint: string;
   subject: string;
   topic: string;
@@ -37,12 +38,100 @@ function App() {
   const [error, setError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Add table styling and image hover functionality
+  useEffect(() => {
+    // Style all tables with sky blue headers
+    const styleAllTables = () => {
+      const tables = document.querySelectorAll('table');
+      tables.forEach(table => {
+        // Style the table
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginTop = '10px';
+        table.style.marginBottom = '10px';
+
+        // Style header rows
+        const headerRows = table.querySelectorAll('tr:first-child, thead tr');
+        headerRows.forEach(row => {
+          (row as HTMLElement).style.backgroundColor = '#87CEEB'; // Sky blue
+          (row as HTMLElement).style.color = '#000';
+          (row as HTMLElement).style.fontWeight = 'bold';
+        });
+
+        // Style all cells
+        const cells = table.querySelectorAll('td, th');
+        cells.forEach(cell => {
+          (cell as HTMLElement).style.border = '1px solid #ddd';
+          (cell as HTMLElement).style.padding = '8px';
+          (cell as HTMLElement).style.textAlign = 'left';
+        });
+      });
+    };
+
+    // Add image hover functionality
+    const addImageHoverInfo = () => {
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        // Create hover tooltip for image source
+        img.style.cursor = 'pointer';
+        img.title = `Image source: ${img.src}`;
+
+        // Add click functionality to open image in new tab
+        img.addEventListener('click', () => {
+          window.open(img.src, '_blank');
+        });
+
+        // Look for image source information in nearby text
+        const parent = img.parentElement;
+        if (parent) {
+          const nextElements = Array.from(parent.parentElement?.children || []);
+          const currentIndex = nextElements.indexOf(parent);
+
+          // Look for "Image Source:" or similar text in following elements
+          for (let i = currentIndex + 1; i < Math.min(currentIndex + 5, nextElements.length); i++) {
+            const element = nextElements[i];
+            const text = element.textContent || '';
+
+            if (text.toLowerCase().includes('image source:') || text.toLowerCase().includes('from:')) {
+              // Extract the source info and add it to the title
+              const sourceText = text.replace(/image source:/i, '').replace(/from:/i, '').trim();
+              img.title = `${img.title}\n\nSource: ${sourceText}`;
+
+              // Look for URLs in the source text and make them clickable
+              const urlMatch = sourceText.match(/(https?:\/\/[^\s\)]+)/);
+              if (urlMatch) {
+                const url = urlMatch[1];
+                img.style.border = '2px solid #007bff';
+                img.title = `${img.title}\n\nClick to view source: ${url}`;
+
+                // Override click to go to source instead of just the image
+                img.removeEventListener('click', () => window.open(img.src, '_blank'));
+                img.addEventListener('click', () => {
+                  window.open(url, '_blank');
+                });
+              }
+              break;
+            }
+          }
+        }
+      });
+    };
+
+    // Apply styling after a short delay to ensure content is rendered
+    const timer = setTimeout(() => {
+      styleAllTables();
+      addImageHoverInfo();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [processedQuestions]); // Re-run when questions change
+
   const fetchQuestionsByIds = async (ids: string[]) => {
     if (!ids || ids.length === 0) return;
 
     // The new, simpler query targeting our view
     const { data, error } = await supabase
-      .from('questions_with_all_relations') // <-- Use the new view
+      .from('questions_with_all_relations') // <-- Use the new view if it exists
       .select('*') // <-- Select everything, the view has all the data!
       .in('id', ids);
 
@@ -111,15 +200,18 @@ function App() {
         {processedQuestions.map((q) => (
           <div key={q.id} className="question-card">
             <h3>
+              {q.question_bank && <span className="question-bank-badge">{q.question_bank}</span>}
               {q.subject}: {q.topic}
             </h3>
             <div className="metadata">
               <span>
                 <strong>Blueprint:</strong> {q.blueprint}
               </span>
-              <span>
-                <strong>Difficulty:</strong> {q.difficulty}
-              </span>
+              {q.difficulty && (
+                <span>
+                  <strong>Difficulty:</strong> {q.difficulty}
+                </span>
+              )}
               <div className="tags">
                 {q.tags.map((tag) => (
                   <span key={tag.name} className="tag">
@@ -159,6 +251,38 @@ function App() {
                 </p>
               </div>
             ))}
+
+            {q.articles && q.articles.length > 0 && (
+              <>
+                <h4>References</h4>
+                <div className="references">
+                  {q.articles.map((article, i) => (
+                    <p key={i} className="reference-item">
+                      {article.text}
+                    </p>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {q.quick_hits && q.quick_hits.length > 0 && (
+              <>
+                <h4>QuickHits</h4>
+                <div className="quickhits">
+                  {q.quick_hits.map((qh, i) => (
+                    <div key={i} className="quickhit-item">
+                      <p><strong>Question:</strong> {qh.question_text}</p>
+                      {qh.answers.map((ans, j) => (
+                        <div key={j} className={`quickhit-answer ${ans.is_correct ? 'correct' : ''}`}>
+                          {ans.text}
+                        </div>
+                      ))}
+                      <p><strong>Rationale:</strong> {qh.rationale}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>

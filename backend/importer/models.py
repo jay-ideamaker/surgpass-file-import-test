@@ -1,4 +1,4 @@
-# importer/models.py
+# backend/importer/models.py
 from django.db import models
 import uuid
 
@@ -14,11 +14,12 @@ class Question(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
     # --- Metadata Fields ---
-    blueprint = models.CharField(max_length=255, blank=True, null=True)
-    subject = models.CharField(max_length=255, blank=True, null=True)
-    category = models.CharField(max_length=255, blank=True, null=True)
-    subcategory = models.CharField(max_length=255, blank=True, null=True)
-    topic = models.CharField(max_length=255, blank=True, null=True)
+    question_bank = models.TextField(blank=True, null=True)  # ABSITE or ABS QE
+    blueprint = models.TextField( blank=True, null=True)
+    subject = models.TextField( blank=True, null=True)
+    category = models.TextField( blank=True, null=True)
+    subcategory = models.TextField( blank=True, null=True)
+    topic = models.TextField( blank=True, null=True)
     difficulty = models.FloatField(blank=True, null=True)
     
     # Many-to-many relationship for tags
@@ -26,13 +27,13 @@ class Question(models.Model):
 
     # --- Content Fields ---
     question_text = models.TextField(blank=True, null=True)
-    short_explanation = models.TextField(blank=True, null=True)
-    full_explanation = models.TextField(blank=True, null=True)
+    short_explanation = models.TextField(blank=True, null=True)  # Key Point
+    full_explanation = models.TextField(blank=True, null=True)   # Expanded Explanation
     
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Question: {self.topic or 'Untitled'}"
+        return f"Question: {self.topic or 'Untitled'} ({self.question_bank})"
 
 # A model for each of the 5 multiple-choice answers for a parent question.
 class AnswerChoice(models.Model):
